@@ -1,47 +1,91 @@
-const http = require('http');
+const express = require('express');
+const mysql = require('mysql2');
+const app = express();
+const PORT = 3000;
 
-const server = http.createServer((req, res) => {
-    const urlParts = req.url.split('?');
-    const path = urlParts[0];
-    const params = new URLSearchParams(urlParts[1]);
+app.use(express.json());
 
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-    if (path === '/') {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end('<h1>Привет, Октагон!</h1>');
-        return;
-    }
-    
-    if (path === '/static') {
-        res.end(JSON.stringify({
-            header: "Hello",
-            body: "Octagon NodeJS Test"
-        }));
-        return;
-    }
-
-    if (path === '/dynamic') {
-        const a = parseFloat(params.get('a'));
-        const b = parseFloat(params.get('b'));
-        const c = parseFloat(params.get('c'));
-
-        if (isNaN(a) || isNaN(b) || isNaN(c)) {
-            res.end(JSON.stringify({ header: "Error" }));
-            return;
-        }
-
-        const result = (a * b * c) / 3;
-        res.end(JSON.stringify({
-            header: "Calculated",
-            body: result.toString()
-        }));
-        return;
-    }
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Страница не найдена');
+const connection = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',           
+    password: '',           
+    database: 'ChatBotTests' 
 });
 
-server.listen(3000, () => {
-    console.log('Сервер запущен: http://localhost:3000');
+connection.connect(err => {
+    if (err) {
+        console.error('Ошибка подключения к БД:', err);
+    } else {
+        console.log('Успешное подключение к MySQL');
+    }
+});
+
+
+app.get('/getAllItems', (req, res) => {
+    connection.query('SELECT * FROM Items', (err, results) => {
+        if (err) return res.json(null);
+        res.json(results);
+    });
+});
+
+app.post('/addItem', (req, res) => {
+    const { name, desc } = req.query;
+
+    if (!name || !desc) {
+        return res.json(null);
+    }
+
+    connection.query('INSERT INTO Items (name, `desc`) VALUES (?, ?)', [name, desc], (err, result) => {
+        if (err) return res.json(null);
+
+        connection.query('SELECT * FROM Items WHERE id = ?', [result.insertId], (err2, results) => {
+            if (err2) return res.json(null);
+            res.json(results[0]);
+        });
+    });
+});
+
+app.post('/deleteItem', (req, res) => {
+    const { id } = req.query;
+
+    if (!id || isNaN(id)) {
+        return res.json(null);
+    }
+
+    connection.query('DELETE FROM Items WHERE id = ?', [id], (err, result) => {
+        if (err) return res.json(null);
+
+        if (result.affectedRows === 0) {
+            res.json({});
+        } else {
+            res.json({ success: true });
+        }
+    });
+});
+
+app.post('/updateItem', (req, res) => {
+    const { id, name, desc } = req.query;
+
+    if (!id || isNaN(id) || !name || !desc) {
+        return res.json(null);
+    }
+
+    connection.query('UPDATE Items SET name = ?, `desc` = ? WHERE id = ?', [name, desc, id], (err, result) => {
+        if (err) return res.json(null);
+
+        if (result.affectedRows === 0) {
+            res.json({});
+        } else {
+            connection.query('SELECT * FROM Items WHERE id = ?', [id], (err2, results) => {
+                if (err2) return res.json(null);
+                res.json(results[0]);
+            });
+        }
+    });
+});
+
+
+app.listen(PORT, () => {
+    console.log(`Сервер запущен: http://localhost:${PORT}`);
 });
