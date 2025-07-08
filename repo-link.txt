@@ -1,1 +1,1 @@
-https://github.com/Witheris/NodeJS/tree/telegram_bot_commands
+https://github.com/Witheris/NodeJS/tree/telegram_bot_db_commands
